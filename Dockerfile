@@ -29,4 +29,4 @@ RUN apt-get update && apt-get install -y \
 EXPOSE 8081
 
 # Java 애플리케이션 실행
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+ENTRYPOINT ["java", "-Duser.timezone=Asia/Seoul", "-jar", "/app.jar"]

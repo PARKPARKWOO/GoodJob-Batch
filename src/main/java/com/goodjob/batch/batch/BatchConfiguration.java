@@ -4,8 +4,10 @@ package com.goodjob.batch.batch;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.goodjob.batch.api.SaraminApiManager;
 import com.goodjob.batch.crawling.WontedStatistic;
+import com.goodjob.batch.exception.CrawlingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.openqa.selenium.WebDriverException;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -26,7 +28,9 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.io.IOException;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 
 
 @Configuration
@@ -34,19 +38,15 @@ import java.util.concurrent.ExecutionException;
 @RequiredArgsConstructor
 public class BatchConfiguration {
     private final PlatformTransactionManager transactionManager;
-
-    private final BatchProducer producer;
-
     private final ObjectMapper mapper;
-
+    private final BatchProducer producer;
     @Bean
     public TaskExecutor taskExecutor() {
         SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor();
-        taskExecutor.setConcurrencyLimit(8);
+        taskExecutor.setConcurrencyLimit(20);
         return taskExecutor;
     }
 
-    // 병렬처리 고민
     @Bean
     public Job job1(JobRepository jobRepository) {
         Flow saramin = new FlowBuilder<SimpleFlow>("saramin")
@@ -62,18 +62,13 @@ public class BatchConfiguration {
         Flow wontedFullStack = new FlowBuilder<SimpleFlow>("wontedFullStack")
                 .start(step4(jobRepository))
                 .build();
-//        Flow db = new FlowBuilder<SimpleFlow>("db작업")
-//                .start(step5(jobRepository))
-//                .next(step6(jobRepository))
-//                .next(step7(jobRepository))
-//                .build();
+
 
 
         return new JobBuilder("job1", jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(saramin)
                 .split(taskExecutor()).add(wontedBack, wontedFront, wontedFullStack)
-//                .next(db)
                 .end()
                 .build();
     }
@@ -123,7 +118,10 @@ public class BatchConfiguration {
             for (int i = 0; i < 10; i++) {
                 try {
                     wontedStatistic.crawlWebsite(back, i);
-                }  catch (IOException | InterruptedException | WebDriverException | ExecutionException e) {
+                }  catch (IOException | InterruptedException |
+                          WebDriverException | ExecutionException |
+                          CrawlingException e)
+                {
                     log.error(e.getMessage());
                 }
             }
@@ -147,7 +145,10 @@ public class BatchConfiguration {
             for (int i = 0; i < 10; i++) {
                 try {
                     wontedStatistic.crawlWebsite(front, i);
-                }  catch (IOException | InterruptedException | WebDriverException | ExecutionException e) {
+                }  catch (IOException | InterruptedException |
+                          WebDriverException | ExecutionException |
+                          CrawlingException e)
+                {
                     log.error(e.getMessage());
                 }
             }
@@ -174,7 +175,10 @@ public class BatchConfiguration {
             for (int i = 0; i < 10; i++) {
                 try {
                     wontedStatistic.crawlWebsite(fullStack, i);
-                } catch (IOException | InterruptedException | WebDriverException | ExecutionException e) {
+                } catch (IOException | InterruptedException |
+                         WebDriverException | ExecutionException |
+                         CrawlingException e)
+                {
                     log.error(e.getMessage());
                 }
             }
